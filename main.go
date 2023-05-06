@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Gprisco/yeelightcontrol/src/yeelight"
+	"github.com/Gprisco/yeelightcontrol/yeelight"
 )
 
 const (
