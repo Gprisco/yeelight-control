@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"net"
+	"os"
 
 	"github.com/Gprisco/yeelightcontrol/yeelight"
+	"github.com/urfave/cli/v2"
 )
 
 const (
@@ -12,7 +14,7 @@ const (
 	localAddr     = "0.0.0.0:0"
 )
 
-func main() {
+func searchBulbs() {
 	// Step 1: Create a UDP connection and bind to a local address.
 	conn, err := net.ListenPacket("udp", localAddr)
 	if err != nil {
@@ -36,4 +38,26 @@ func main() {
 	}
 
 	log.Println(response)
+}
+
+func main() {
+	app := &cli.App{
+		Name:  "yeelightctl",
+		Usage: "Control yeelight bulbs under your local network",
+		Commands: []*cli.Command{
+			{
+				Name:    "search",
+				Aliases: []string{"s"},
+				Usage:   "Search bulbs on local network",
+				Action: func(cCtx *cli.Context) error {
+					searchBulbs()
+					return nil
+				},
+			},
+		},
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
 }
