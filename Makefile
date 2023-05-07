@@ -3,3 +3,6 @@ run:
 
 build:
 	go build main.go -o bin/yeelightctl
+
+tests:
+	go test ./...
