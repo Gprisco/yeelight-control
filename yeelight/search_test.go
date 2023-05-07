@@ -1,4 +1,4 @@
-package yeelight_test
+package yeelight
 
 import (
 	"errors"
@@ -6,17 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Gprisco/yeelightcontrol/yeelight"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
+// ----- Creating a PacketConn mock
 type mockPacketConn struct {
 	mock.Mock
 	ReceiverAddr net.Addr
 	Message      string
 }
 
+// ----- Implementing PacketConn interface
 func (m *mockPacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	args := m.Called(p)
 	copy(p, []byte(args.String(0)))
@@ -41,78 +42,63 @@ func (*mockPacketConn) SetReadDeadline(t time.Time) error { return nil }
 
 func (*mockPacketConn) SetWriteDeadline(t time.Time) error { return nil }
 
-const searchMessage = "M-SEARCH * HTTP/1.1\r\n" +
-	"MAN: \"ssdp:discover\"\r\n" +
-	"ST: wifi_bulb\r\n\r\n"
-
-func TestSendSearchMessage(t *testing.T) {
-	// given a connection and an address on which to send the message
-	wantedAddr := "1.2.3.4:1234"
+func TestSearch(t *testing.T) {
+	// given a mock packet connection
 	mockConn := &mockPacketConn{}
-
 	mockConn.On("WriteTo", mock.Anything, mock.Anything).Return(nil)
-
-	// when sending the message
-	err := yeelight.SendSearchMessage(mockConn, wantedAddr)
-
-	// then it should have sent the search message on the given address
-	assert.Nil(t, err)
-	assert.Equal(t, wantedAddr, mockConn.ReceiverAddr.String())
-	assert.Equal(t, searchMessage, mockConn.Message)
-}
-
-func TestFailingAddressParsingInSendSearchMessage(t *testing.T) {
-	// given a connection and an invalid address on which to send the message
-	wantedAddr := "this is not a valid address"
-	mockConn := &mockPacketConn{}
-
-	mockConn.On("WriteTo", mock.Anything, mock.Anything).Return(nil)
-
-	// when sending the message
-	err := yeelight.SendSearchMessage(mockConn, wantedAddr)
-
-	// then there's an error
-	assert.Equal(t, &net.AddrError{Err: "missing port in address", Addr: "this is not a valid address"}, err)
-}
-
-func TestFailingWriteToSendSearchMessage(t *testing.T) {
-	// given a connection and an address on which to send the message
-	wantedAddr := "1.2.3.4:1234"
-	mockConn := &mockPacketConn{}
-
-	mockConn.On("WriteTo", mock.Anything, mock.Anything).Return(errors.New("mock failure when writing"))
-
-	// when sending the message
-	err := yeelight.SendSearchMessage(mockConn, wantedAddr)
-
-	// then it should have sent the search message on the given address
-	assert.Equal(t, errors.New("mock failure when writing"), err)
-}
-
-func TestReceiveResponse(t *testing.T) {
-	// given a mock connection
-	mockConn := &mockPacketConn{}
 	mockConn.On("ReadFrom", mock.Anything).Return("mock response", nil)
 
-	// when reading the response
-	response, err := yeelight.ReceiveSearchResponse(mockConn)
+	// and a mock bulb searcher
+	bulbSearcher := &BulbSearcher{
+		conn:          mockConn,
+		multicastAddr: "1.2.3.4:1234",
+	}
 
-	// then it should have received a response
-	expectedResponse := make([]byte, 1024)
-	copy(expectedResponse, "mock response")
+	// when calling HandleSearch
+	res, err := bulbSearcher.Search()
+
+	// then err should be nil
+	p := make([]byte, 1024)
+	copy(p, "mock response")
 
 	assert.Nil(t, err)
-	assert.Equal(t, string(expectedResponse), response)
+	assert.Equal(t, string(p), res)
 }
 
-func TestFailingReceiveResponse(t *testing.T) {
-	// given a mock connection
+func TestFailingWriteToSearch(t *testing.T) {
+	// given a mock failing packet connection
 	mockConn := &mockPacketConn{}
-	mockConn.On("ReadFrom", mock.Anything).Return("", errors.New("mock error"))
+	mockConn.On("WriteTo", mock.Anything, mock.Anything).Return(errors.New("mock WriteTo error"))
+	mockConn.On("ReadFrom", mock.Anything).Return("mock response", nil)
 
-	// when reading the response
-	_, err := yeelight.ReceiveSearchResponse(mockConn)
+	// and a mock bulb searcher
+	bulbSearcher := &BulbSearcher{
+		conn:          mockConn,
+		multicastAddr: "1.2.3.4:1234",
+	}
 
-	// then it should have received an error
-	assert.Equal(t, errors.New("mock error"), err)
+	// when calling HandleSearch
+	_, err := bulbSearcher.Search()
+
+	// then err should be nil
+	assert.Equal(t, errors.New("mock WriteTo error"), err)
+}
+
+func TestFailingReadFromSearch(t *testing.T) {
+	// given a mock failing packet connection
+	mockConn := &mockPacketConn{}
+	mockConn.On("WriteTo", mock.Anything, mock.Anything).Return(nil)
+	mockConn.On("ReadFrom", mock.Anything).Return("", errors.New("mock ReadFrom error"))
+
+	// and a mock bulb searcher
+	bulbSearcher := &BulbSearcher{
+		conn:          mockConn,
+		multicastAddr: "1.2.3.4:1234",
+	}
+
+	// when calling HandleSearch
+	_, err := bulbSearcher.Search()
+
+	// then err should be nil
+	assert.Equal(t, errors.New("mock ReadFrom error"), err)
 }

@@ -10,11 +10,12 @@ import (
 )
 
 const (
+	// The multicast port on which to send the search message https://www.yeelight.com/en_US/developer
 	multicastAddr = "239.255.255.250:1982"
 	localAddr     = "0.0.0.0:0"
 )
 
-func searchBulbs() {
+func handleSearchBulbs() {
 	// Step 1: Create a UDP connection and bind to a local address.
 	conn, err := net.ListenPacket("udp", localAddr)
 	if err != nil {
@@ -23,14 +24,9 @@ func searchBulbs() {
 	}
 	defer conn.Close()
 
-	// Step 2: Multicast the search request message.
-	if err = yeelight.SendSearchMessage(conn, multicastAddr); err != nil {
-		log.Printf("Failed to broadcast search message: %v\n", err)
-		return
-	}
+	bulbSearcher := yeelight.NewBulbSearcher(conn, multicastAddr)
 
-	// Step 3: Wait for the response message.
-	response, err := yeelight.ReceiveSearchResponse(conn)
+	response, err := bulbSearcher.Search()
 
 	if err != nil {
 		log.Printf("Failed to get response from yeelight: %v\n", err)
@@ -50,7 +46,7 @@ func main() {
 				Aliases: []string{"s"},
 				Usage:   "Search bulbs on local network",
 				Action: func(cCtx *cli.Context) error {
-					searchBulbs()
+					handleSearchBulbs()
 					return nil
 				},
 			},
