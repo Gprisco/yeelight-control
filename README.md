@@ -3,7 +3,7 @@ A simple golang cli program that implements the [Yeelight Inter-Operation Specif
 
 ## Operations
 ### Search
-Our program will multicast a search request and wait for a unicast response to be received.
+Our program will multicast a search request and wait for a unicast response to be received, which will contain device details, including its address and some status info.
 
 ## To do
 * Handle multiple unicast **search** responses to be received, every yeelight device available will send one with its location details
